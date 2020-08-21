@@ -7,6 +7,7 @@ import webdav3.exceptions
 import click
 
 import re
+import os
 import keyring
 import readline
 import dateutil
@@ -20,34 +21,69 @@ theclient = None
 @click.group(invoke_without_command=True, chain=True)
 @click.pass_context
 def cli(ctx):
+
+    ctx.ensure_object(dict)
+
+    if 'INIT' not in ctx.obj:
+        ctx.obj['INIT'] = False
+
+    if not ctx.obj['INIT']:
+        init.invoke(click.get_current_context())
+
     if ctx.invoked_subcommand is None:
         cmd = cli.get_command(ctx,'shell')
         # cmd.parse_args(ctx,sys.argv[1:])
         cmd.invoke(ctx)
 
+@cli.command()
+def init():
+    for filename in ["/Users/tom/.tdavrc"]:
+        if os.path.exists(filename):
+            print (f"Calling load {filename}")
+            loadfile(filename)
 
 @cli.command()
-@click.pass_context
-def shell(ctx):
+@click.argument("filename")
+def load(filename):
+    loadfile(filename)
+
+def loadfile(filename):
+    try:
+        with open(filename) as f:
+            for i,line in enumerate(f):
+                run_textcommand(line)
+
+    except FileNotFoundError:
+        click.echo(click.style(f"ERROR: file '{filename}' not found", fg='red'))
+
+    except click.UsageError as ex:
+        click.echo(click.style(f"ERROR in {filename}:{i}: {ex}", fg='red'))
+
+
+@cli.command()
+def shell():
 
     while True:
         line = input("> ")
 
         try:
-            run_textcommand(ctx,line)
+            run_textcommand(line)
 
         except click.UsageError as ex:
             click.echo(click.style(f"ERROR: {ex}", fg='red'))
 
 
-def run_textcommand(ctx,line):
+# def run_textcommand(ctx,line):
+def run_textcommand(line):
 
-    tokens = line.split(' ')
-    cmd = cli.get_command(ctx,tokens[0])
+    tokens = line.rstrip().split(' ')
+
+    cmd = cli.get_command(click.get_current_context(), tokens[0])
+
     if cmd is None:
-        raise click.UsageError(f"unknown command '{tokens[0]}'", ctx)
+        raise click.UsageError(f"unknown command '{tokens[0]}'")
 
-    cmd.parse_args(ctx,tokens[1:])
+    ctx = cmd.make_context(tokens[0], tokens[1:])
     cmd.invoke(ctx)
 
 
@@ -107,7 +143,7 @@ def put(localfile,remotefile=None):
 
 
 if __name__ == '__main__':
-    cli()
+    cli(obj={})
 
 
 # import argparse
