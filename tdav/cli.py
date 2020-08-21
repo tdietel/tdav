@@ -11,8 +11,22 @@ import os
 import keyring
 import readline
 import dateutil
+from datetime import datetime
+
+# ==========================================================================
+# Global variables
 
 theclient = None
+
+filepatterns = [
+lambda x: re.sub(".*/notes.pdf", "Lecture Notes.pdf", x),
+lambda x: re.sub("notes.pdf", "Lecture Notes.pdf", x),
+lambda x:
+  re.sub(".*/(2020-\d\d-\d\d) \d\d\.\d\d\.\d\d Statistical Physics 94813308411/zoom_0.mp4",
+         "/Statistical Physics/Zoom Recordings/\\1.mp4", x),
+]
+
+
 
 # ==========================================================================
 # The default entry point can either call a subcommand directly if specified
@@ -76,7 +90,14 @@ def shell():
 # def run_textcommand(ctx,line):
 def run_textcommand(line):
 
+    # ignore comments
+    line = re.sub("#.*$","",line)
+
+    # ignore empty lines
+    if re.match("^\s*$", line): return
+
     tokens = line.rstrip().split(' ')
+
 
     cmd = cli.get_command(click.get_current_context(), tokens[0])
 
@@ -139,7 +160,64 @@ def ls(path):
 @cli.command()
 @click.argument("localfile")
 def put(localfile,remotefile=None):
-    print(localfile, "->", remotefile)
+    # print(localfile, "->", remotefile)
+
+    #### Check local file
+    try:
+        finfo = { 'stat': os.stat(localfile) }
+    except FileNotFoundError as ex:
+        print (f'Local file "{localfile}" does not exist')
+        return
+
+    finfo['mtime'] = datetime.fromtimestamp(finfo['stat'].st_mtime, dateutil.tz.gettz())
+
+    if True:
+        print ("Local file:")
+        print ("  File name:", localfile)
+        print ("  File size:", finfo['stat'].st_size)
+        print ("  Modified: ", finfo['mtime'])
+        # print ("  Modified: ", finfo['mtime'], finfo['mtime'].tzinfo)
+
+    if remotefile is None:
+        rpath = localfile
+
+        for fp in filepatterns:
+            rpath = fp(rpath)
+            # print (pattern,rpath)
+
+    else:
+        rpath = remotefile
+
+
+    # retrieve info about remote file
+    rinfo = None
+    try:
+        rinfo = theclient.info(rpath)
+
+        # rinfo['mtime'] = datetime.strptime(rinfo['modified'], '%a, %d %b %Y %H:%M:%S %Z')
+        rinfo['mtime'] = dateutil.parser.parse(rinfo['modified'])
+
+        if True:
+            print ("Remote file:")
+            print ("  Full path:", rpath)
+            print ("  File name:", rinfo['name'])
+            print ("  File size:", rinfo['size'])
+            # print ("  Modified: ", rinfo['mtime'], rinfo['mtime'].tzinfo)
+            print ("  Modified: ", rinfo['mtime'])
+
+    except webdav3.exceptions.RemoteResourceNotFound as ex:
+        print ("Remote file does not exist")
+        pass
+
+    # print(localfile, "->", rpath)
+
+    if rinfo is not None and rinfo['mtime'] > finfo['mtime']:
+        print (f'Remote file is newer than local file {i} - skip upload')
+
+    else:
+        print (f'Uploading "{localfile}" to "{rpath}"')
+        theclient.upload_sync(remote_path=rpath, local_path=localfile)
+        # print(client.info(rpath))
 
 
 if __name__ == '__main__':
