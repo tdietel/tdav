@@ -11,34 +11,41 @@ import os
 import keyring
 import readline
 import dateutil
+import shlex
+
 from datetime import datetime
+from pprint import pprint
+
+from .param import param
+
+# import tdav.config
 
 # ==========================================================================
 # Global variables
 
 theclient = None
 
-filepatterns = [
-# lambda x: re.sub(".*/notes.pdf", "Lecture Notes.pdf", x),
-# lambda x: re.sub("notes.pdf", "Lecture Notes.pdf", x),
-
-# lambda x: re.sub(".*/\wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
-# lambda x: re.sub("wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
-
-lambda x:
-  re.sub(".*/(2020-\d\d-\d\d) \d\d\.\d\d\.\d\d Statistical Physics 94813308411/zoom_0.mp4",
-         "/Statistical Physics/Zoom Recordings/\\1.mp4", x),
-]
-
-put_regex_patterns = [
-("wps\\d.pdf", "/Statistical Physics/Problem Set / Tutorial \\\\1.pdf"),
-]
-
-for p in put_regex_patterns:
-    filepatterns.append( lambda x: re.sub(p[0],p[1],x))
-    filepatterns.append( lambda x: re.sub(".*/"+p[0],p[1],x))
-
-print(filepatterns)
+# filepatterns = [
+# # lambda x: re.sub(".*/notes.pdf", "Lecture Notes.pdf", x),
+# # lambda x: re.sub("notes.pdf", "Lecture Notes.pdf", x),
+#
+# # lambda x: re.sub(".*/\wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
+# # lambda x: re.sub("wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
+#
+# lambda x:
+#   re.sub(".*/(2020-\d\d-\d\d) \d\d\.\d\d\.\d\d Statistical Physics 94813308411/zoom_0.mp4",
+#          "/Statistical Physics/Zoom Recordings/\\1.mp4", x),
+# ]
+#
+# put_regex_patterns = [
+# ("wps\\d.pdf", "/Statistical Physics/Problem Set / Tutorial \\\\1.pdf"),
+# ]
+#
+# for p in put_regex_patterns:
+#     filepatterns.append( lambda x: re.sub(p[0],p[1],x))
+#     filepatterns.append( lambda x: re.sub(".*/"+p[0],p[1],x))
+#
+# # print(filepatterns)
 
 # ==========================================================================
 # The default entry point can either call a subcommand directly if specified
@@ -48,25 +55,14 @@ print(filepatterns)
 @click.pass_context
 def cli(ctx):
 
-    ctx.ensure_object(dict)
-
-    if 'INIT' not in ctx.obj:
-        ctx.obj['INIT'] = False
-
-    if not ctx.obj['INIT']:
-        init.invoke(click.get_current_context())
+    # Instantiate the config object of type tdav.param
+    ctx.ensure_object( param )
 
     if ctx.invoked_subcommand is None:
         cmd = cli.get_command(ctx,'shell')
         # cmd.parse_args(ctx,sys.argv[1:])
         cmd.invoke(ctx)
 
-@cli.command()
-def init():
-    for filename in ["/Users/tom/.tdavrc"]:
-        if os.path.exists(filename):
-            print (f"Calling load {filename}")
-            loadfile(filename)
 
 @cli.command()
 @click.argument("filename")
@@ -102,14 +98,8 @@ def shell():
 # def run_textcommand(ctx,line):
 def run_textcommand(line):
 
-    # ignore comments
-    line = re.sub("#.*$","",line)
-
-    # ignore empty lines
-    if re.match("^\s*$", line): return
-
-    tokens = line.rstrip().split(' ')
-
+    tokens = shlex.split(line, comments=True)
+    # print(tokens)
 
     cmd = cli.get_command(click.get_current_context(), tokens[0])
 
@@ -146,6 +136,11 @@ def connect(url,username,password):
 @click.argument("path",default="")
 def ls(path):
     # global theclient
+
+    if theclient is None:
+        print("error: not connected")
+        return
+
     for f in theclient.list(path,get_info=True):
 
         if f['isdir']:
@@ -168,10 +163,34 @@ def ls(path):
 
         print(f['name'])
 
+@cli.command()
+@click.argument('txt', nargs=-1)
+def echo(txt):
+    print(' '.join(txt))
 
 @cli.command()
 @click.argument("localfile")
-def put(localfile,remotefile=None):
+def up(localfile):
+
+    for u in click.get_current_context().obj.upscripts:
+
+        for i in ['pattern', 'script']:
+            if i not in u:
+                print(f"error: upload script: required parameter {i} not found")
+
+        m = re.match(u['pattern'],localfile)
+        if m:
+            for line in u['script']:
+                run_textcommand(m.expand(line).replace('@',localfile))
+            return
+
+    print(f"no matching upload script for {localfile}")
+
+
+@cli.command()
+@click.argument("localfile")
+@click.argument("remotefile", required=False)
+def put(localfile,remotefile):
     # print(localfile, "->", remotefile)
 
     #### Check local file
@@ -223,13 +242,26 @@ def put(localfile,remotefile=None):
     # print(localfile, "->", rpath)
 
     if rinfo is not None and rinfo['mtime'] > finfo['mtime']:
-        print (f'Remote file is newer than local file {i} - skip upload')
+        print (f'Remote file is newer than local file {localfile} - skip upload')
 
     else:
         print (f'Uploading "{localfile}" to "{rpath}"')
         theclient.upload_sync(remote_path=rpath, local_path=localfile)
         # print(client.info(rpath))
 
+
+@cli.command()
+@click.pass_context
+def cfg(ctx):
+    cf = ctx.obj
+
+    print("Profiles:")
+    pprint(cf.profiles)
+    print()
+
+    print("Upload scripts:")
+    pprint(cf.upscripts)
+    print()
 
 if __name__ == '__main__':
     cli(obj={})
