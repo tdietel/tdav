@@ -19,14 +19,26 @@ from datetime import datetime
 theclient = None
 
 filepatterns = [
-lambda x: re.sub(".*/notes.pdf", "Lecture Notes.pdf", x),
-lambda x: re.sub("notes.pdf", "Lecture Notes.pdf", x),
+# lambda x: re.sub(".*/notes.pdf", "Lecture Notes.pdf", x),
+# lambda x: re.sub("notes.pdf", "Lecture Notes.pdf", x),
+
+# lambda x: re.sub(".*/\wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
+# lambda x: re.sub("wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
+
 lambda x:
   re.sub(".*/(2020-\d\d-\d\d) \d\d\.\d\d\.\d\d Statistical Physics 94813308411/zoom_0.mp4",
          "/Statistical Physics/Zoom Recordings/\\1.mp4", x),
 ]
 
+put_regex_patterns = [
+("wps\\d.pdf", "/Statistical Physics/Problem Set / Tutorial \\\\1.pdf"),
+]
 
+for p in put_regex_patterns:
+    filepatterns.append( lambda x: re.sub(p[0],p[1],x))
+    filepatterns.append( lambda x: re.sub(".*/"+p[0],p[1],x))
+
+print(filepatterns)
 
 # ==========================================================================
 # The default entry point can either call a subcommand directly if specified
@@ -183,7 +195,6 @@ def put(localfile,remotefile=None):
 
         for fp in filepatterns:
             rpath = fp(rpath)
-            # print (pattern,rpath)
 
     else:
         rpath = remotefile
