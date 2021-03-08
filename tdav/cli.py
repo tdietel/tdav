@@ -52,11 +52,23 @@ theclient = None
 # on the command line, or starts an interactive shell otherwise.
 
 @click.group(invoke_without_command=True, chain=True)
+@click.option('-v', '--verbose', count=True)
 @click.pass_context
-def cli(ctx):
+def cli(ctx, verbose):
 
     # Instantiate the config object of type tdav.param
     ctx.ensure_object( param )
+
+    cfg = ctx.obj
+
+    if cfg.connect is not None:
+        url  = cfg.connect['url']
+        user = cfg.connect['username'] if 'username' in cfg.connect else None
+        pw   = cfg.connect['password'] if 'password' in cfg.connect else None
+
+        _connect( url, user, pw )
+
+    cfg.verbosity += verbose
 
     if ctx.invoked_subcommand is None:
         cmd = cli.get_command(ctx,'shell')
@@ -114,13 +126,17 @@ def run_textcommand(line):
 @click.argument("url")
 @click.option("--username")
 @click.option("--password", default=None)
-def connect(url,username,password):
+def connect(url,username,password=None):
 
-    options = {
-        'webdav_hostname': url,
-        'webdav_login': username,
-        'webdav_password': password
-    }
+    _connect(url,username,password)
+
+
+def _connect(url,username,password):
+
+    options = dict(
+      webdav_hostname = url,
+      webdav_login = username,
+      webdav_password = password )
 
     if options['webdav_password'] is None:
         m = re.search('(https?://[a-zA-Z\.]+)', url)
@@ -188,10 +204,25 @@ def up(localfile):
 
 
 @cli.command()
+@click.argument('localfiles', nargs=-1)
+@click.option('-n', '--dry-run', is_flag=True)
+def mput(localfiles, dry_run):
+
+    for f in localfiles:
+        _put(f,None, dry_run)
+
+
+@cli.command()
 @click.argument("localfile")
 @click.argument("remotefile", required=False)
-def put(localfile,remotefile):
+@click.option('-n', '--dry-run', is_flag=True)
+def put(localfile, remotefile, dry_run=False):
     # print(localfile, "->", remotefile)
+
+    _put(localfile,remotefile,dry_run)
+
+def _put(localfile, remotefile=None, dry_run=False):
+    cfg = click.get_current_context().obj
 
     #### Check local file
     try:
@@ -202,7 +233,7 @@ def put(localfile,remotefile):
 
     finfo['mtime'] = datetime.fromtimestamp(finfo['stat'].st_mtime, dateutil.tz.gettz())
 
-    if True:
+    if cfg.verbosity >= 2 :
         print ("Local file:")
         print ("  File name:", localfile)
         print ("  File size:", finfo['stat'].st_size)
@@ -212,12 +243,18 @@ def put(localfile,remotefile):
     if remotefile is None:
         rpath = localfile
 
-        for fp in filepatterns:
-            rpath = fp(rpath)
+        for fp in cfg.filepatterns:
+            m = re.match(fp['match'], rpath)
+            if m:
+                rpath = fp['dest']
 
     else:
         rpath = remotefile
 
+    global theclient
+
+    # pprint(rpath)
+    # pprint(theclient.info(rpath))
 
     # retrieve info about remote file
     rinfo = None
@@ -227,7 +264,7 @@ def put(localfile,remotefile):
         # rinfo['mtime'] = datetime.strptime(rinfo['modified'], '%a, %d %b %Y %H:%M:%S %Z')
         rinfo['mtime'] = dateutil.parser.parse(rinfo['modified'])
 
-        if True:
+        if cfg.verbosity >= 2 :
             print ("Remote file:")
             print ("  Full path:", rpath)
             print ("  File name:", rinfo['name'])
@@ -244,10 +281,12 @@ def put(localfile,remotefile):
     if rinfo is not None and rinfo['mtime'] > finfo['mtime']:
         print (f'Remote file is newer than local file {localfile} - skip upload')
 
+    elif dry_run:
+        click.echo(f'+++DRYRUN+++ Uploading {click.style(localfile, fg="blue")} to {click.style(rpath, fg="blue")}')
+
     else:
-        print (f'Uploading "{localfile}" to "{rpath}"')
+        click.echo(f'Uploading {click.style(localfile, fg="blue")} to {click.style(rpath, fg="blue")}')
         theclient.upload_sync(remote_path=rpath, local_path=localfile)
-        # print(client.info(rpath))
 
 
 @cli.command()
