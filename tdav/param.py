@@ -8,6 +8,7 @@ class param:
     def __init__(self):
 
         self.connect = None
+        self.variables = dict()
         self.profiles = {}
         self.default_profile = None
         self.current_profile = None
@@ -27,6 +28,9 @@ class param:
         with open( cfgfile ) as f:
             cf = yaml.safe_load(f)
 
+
+        if 'variables' in cf:
+            self.variables.update(cf['variables'])
 
         if 'profiles' in cf:
             self.profiles.update(cf['profiles'])

@@ -20,7 +20,7 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires=[
-        'Click', 'webdavclient3', 'keyring'
+        'Click', 'jinja2', 'webdavclient3', 'keyring'
     ],
     entry_points={
         'console_scripts': [

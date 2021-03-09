@@ -12,6 +12,7 @@ import keyring
 import readline
 import dateutil
 import shlex
+import jinja2
 
 from datetime import datetime
 from pprint import pprint
@@ -246,7 +247,8 @@ def _put(localfile, remotefile=None, dry_run=False):
         for fp in cfg.filepatterns:
             m = re.match(fp['match'], rpath)
             if m:
-                rpath = fp['dest']
+                template = jinja2.Template(fp['dest'])
+                rpath = template.render(**m.groupdict(), **cfg.variables)
 
     else:
         rpath = remotefile
