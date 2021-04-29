@@ -181,6 +181,17 @@ def ls(path):
         print(f['name'])
 
 @cli.command()
+@click.argument("path",default="")
+def mkdir(path):
+    # global theclient
+
+    if theclient is None:
+        print("error: not connected")
+        return
+
+    theclient.mkdir(path)
+
+@cli.command()
 @click.argument('txt', nargs=-1)
 def echo(txt):
     print(' '.join(txt))
