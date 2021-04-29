@@ -26,28 +26,6 @@ from .param import param
 
 theclient = None
 
-# filepatterns = [
-# # lambda x: re.sub(".*/notes.pdf", "Lecture Notes.pdf", x),
-# # lambda x: re.sub("notes.pdf", "Lecture Notes.pdf", x),
-#
-# # lambda x: re.sub(".*/\wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
-# # lambda x: re.sub("wps\d.pdf", "/Statistical Physics/Lecture Notes.pdf", x),
-#
-# lambda x:
-#   re.sub(".*/(2020-\d\d-\d\d) \d\d\.\d\d\.\d\d Statistical Physics 94813308411/zoom_0.mp4",
-#          "/Statistical Physics/Zoom Recordings/\\1.mp4", x),
-# ]
-#
-# put_regex_patterns = [
-# ("wps\\d.pdf", "/Statistical Physics/Problem Set / Tutorial \\\\1.pdf"),
-# ]
-#
-# for p in put_regex_patterns:
-#     filepatterns.append( lambda x: re.sub(p[0],p[1],x))
-#     filepatterns.append( lambda x: re.sub(".*/"+p[0],p[1],x))
-#
-# # print(filepatterns)
-
 # ==========================================================================
 # The default entry point can either call a subcommand directly if specified
 # on the command line, or starts an interactive shell otherwise.
@@ -96,7 +74,7 @@ def loadfile(filename):
 
 
 @cli.command()
-def shell():
+def shell(verbose=False):
 
     while True:
         line = input("> ")
@@ -229,8 +207,6 @@ def mput(localfiles, dry_run):
 @click.argument("remotefile", required=False)
 @click.option('-n', '--dry-run', is_flag=True)
 def put(localfile, remotefile, dry_run=False):
-    # print(localfile, "->", remotefile)
-
     _put(localfile,remotefile,dry_run)
 
 def _put(localfile, remotefile=None, dry_run=False):
@@ -317,143 +293,3 @@ def cfg(ctx):
 
 if __name__ == '__main__':
     cli(obj={})
-
-
-# import argparse
-# import yaml
-# import re
-# import os
-# from datetime import datetime
-# import dateutil
-# import readline
-
-# # ---------------------------------------------------------------------------
-# # Parse command line arguments and read configuration file
-#
-# parser = argparse.ArgumentParser(description='Upload file to WebDAV server.')
-# parser.add_argument('--cfgfile', nargs=1, type=argparse.FileType('r'),
-#                     help="Configuration file with DAV site information")
-# parser.add_argument('filename', nargs='+', type=str,
-#                     help="File to be uploaded to Vula")
-#
-# args = parser.parse_args()
-#
-# if 'cfgfile' not in args or args.cfgfile is None:
-#     parser.print_help()
-#
-# if len(args.cfgfile) != 1 :
-#     print("exactly ONE configuration file is expected")
-#     exit(1)
-#
-# try:
-#     cfg = yaml.safe_load(args.cfgfile[0])
-# except yaml.YAMLError as exc:
-#     print(exc)
-#
-# print (args)
-# # print (cfg)
-# # exit(1)
-#
-# # ---------------------------------------------------------------------------
-# # Connect to WebDAV server
-#
-# # set default options from config file
-# options = {
-#  'webdav_hostname': cfg['vula']['site'],
-#  'webdav_login':    cfg['vula']['username'],
-#  'webdav_password': cfg['vula']['password']
-# }
-#
-# # look up password in keyring if requested
-# m = re.search('\+\+\+KEYRING\+\+\+(.+)\+\+\+(.*)', options['webdav_password'])
-# if m:
-#     if m.group(2)=="":
-#         user = options['webdav_login']
-#     else:
-#         user = m.group(2)
-#
-#     options['webdav_password'] = keyring.get_password(m.group(1), user)
-#
-# # connect
-# client = Client(options)
-#
-# # ---------------------------------------------------------------------------
-# # Upload the file
-#
-# for i in args.filename:
-#
-#     #### Check local file
-#     try:
-#         finfo = { 'stat': os.stat(i) }
-#     except FileNotFoundError as ex:
-#         print (b'Local file "{i}" does not exist')
-#         continue
-#
-#     finfo['mtime'] = datetime.fromtimestamp(finfo['stat'].st_mtime, dateutil.tz.gettz())
-#
-#     if True:
-#         print ("Local file:")
-#         print ("  File name:", i)
-#         print ("  File size:", finfo['stat'].st_size)
-#         print ("  Modified: ", finfo['mtime'])
-#         # print ("  Modified: ", finfo['mtime'], finfo['mtime'].tzinfo)
-#
-#
-#     #### Determine remote path
-#     rpath = i
-#
-#
-#     for pattern,repl in cfg['vula']['path'].items():
-#         rpath = re.sub(pattern,repl,rpath)
-#         # print (pattern,rpath)
-#
-#     if rpath==i:
-#         print("File '%s' not found in configuration file" % i)
-#         continue
-#
-#     # make sure we have variables for the following commands
-#     if 'variables' not in cfg:
-#         cfg['variables'] = {}
-#
-#     if 'variables' not in cfg['vula']:
-#         cfg['vula']['variables'] = {}
-#
-#
-#     # print(cfg)
-#
-#     # replace any convenience variables in the file names
-#     vardict = {**cfg['variables'], **cfg['vula']['variables']}
-#     # print(vardict)
-#     rpath = rpath.format(**vardict)
-#
-#
-#     # retrieve info about remote file
-#     rinfo = None
-#     try:
-#         rinfo = client.info(rpath)
-#
-#         # rinfo['mtime'] = datetime.strptime(rinfo['modified'], '%a, %d %b %Y %H:%M:%S %Z')
-#         rinfo['mtime'] = dateutil.parser.parse(rinfo['modified'])
-#
-#         if True:
-#             print ("Remote file:")
-#             print ("  Full path:", rpath)
-#             print ("  File name:", rinfo['name'])
-#             print ("  File size:", rinfo['size'])
-#             # print ("  Modified: ", rinfo['mtime'], rinfo['mtime'].tzinfo)
-#             print ("  Modified: ", rinfo['mtime'])
-#
-#     except webdav3.exceptions.RemoteResourceNotFound as ex:
-#         # print ("Remote file does not exist")
-#         pass
-#
-#
-#     if rinfo is not None and rinfo['mtime'] > finfo['mtime']:
-#         print (f'Remote file is newer than local file {i} - skip upload')
-#
-#     else:
-#         print (f'Uploading "{i}" to "{rpath}"')
-#         client.upload_sync(remote_path=rpath, local_path=i)
-#         # print(client.info(rpath))
-#
-#     print()
