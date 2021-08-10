@@ -8,6 +8,7 @@ import click
 
 import re
 import os
+import getpass
 import keyring
 import readline
 import dateutil
@@ -117,11 +118,22 @@ def _connect(url,username,password):
       webdav_login = username,
       webdav_password = password )
 
+    m = re.search('(https?://[a-zA-Z\.]+)', url)
+    if m:
+        server = m.group(1)
+    else:
+        server = None
+
+    if options['webdav_password'] is None and server is not None:
+        options['webdav_password'] = keyring.get_password(server, username)
+
     if options['webdav_password'] is None:
-        m = re.search('(https?://[a-zA-Z\.]+)', url)
-        if m:
-            server = m.group(1)
-            options['webdav_password'] = keyring.get_password(server, username)
+        options['webdav_password'] = getpass.getpass("Enter password: ")
+
+        if server is not None:
+            save = input("Save password in key chain (yes/NO)? ")
+            if save == 'yes':
+                keyring.set_password(server, username, options['webdav_password'])
 
     global theclient
     theclient = Client(options)
