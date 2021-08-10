@@ -11,7 +11,17 @@ features that I am looking for, mainly in the area of automation. Also the
 tab completion seems to have issues with filenames that contain spaces.
 
 After automating some tasks with Python and the [webdavclient3] module, I
-decided to package my hacks as a more versatile command-line tool.
+decided to package my hacks as (a starting point for) a more versatile
+command-line tool.
+
+Installation
+------------
+
+This project uses `setup.py` for easy installation with pip. An installation in
+editable mode can be done with
+```sh
+pip3 install -e .
+```
 
 References
 ----------
